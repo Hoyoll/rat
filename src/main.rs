@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, fs::{self, DirEntry, create_dir_all}, path::PathBuf};
 
 use chrono::Local;
 
@@ -12,17 +12,45 @@ struct Rat<'rat> {
     references: [();0],
 }
 
+struct RatHead {
+    entry: DirEntry
+}
+
 fn main() {
     let mut args = env::args().skip(1);
     let mut path = PathBuf::from(RAT_DIR);
+    //let dir = fs::read_dir(&path) 
+    if !path.is_dir() {
+        println!("Not suitable directory for rat, try running `rat new`");
+        return;
+    }
     match args.next().as_deref() {
+        Some("new") => {
+            create_dir_all(&path);
+            println!("Rat has been initiated");
+        }
+        Some("lsp") => {
+            println!("Soon...")
+        }
+        Some("ls") => {
+            match fs::read_dir(&path) {
+                Err(_) => (),
+                Ok(dir) => {
+                   for e in dir {
+                       let entry = e.unwrap();
+                       //entry.file_name
+                       //entry.path()
+                    } 
+                }
+            }
+        }
         Some(s) => {
             if let Some(priority) = s.parse::<u32>().ok() {
                 let title = args.collect::<Vec<_>>().join(" ");
                 let now = Local::now();
                 let huid = now.format("%Y-%m-%d_%H-%M-%S").to_string();
                 //let created = now.format("%a %b %e %H:%M:%S %Y %z").to_string();
-                let dir_name = format!("{}_{}_{}",priority, title, huid);
+                let dir_name = format!("{} {} {}",priority, title, huid);
                 path = path.join(&dir_name);
 
                 if let Err(e) = fs::create_dir_all(&path) {

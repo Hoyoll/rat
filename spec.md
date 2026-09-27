@@ -1,15 +1,18 @@
 # Dir structure
 ./rat
-    /<task-name>-<HUID>
-        /HEAD.toml
+    /<Task-name>
+        /HEAD.md
 
 # Task-name
-<Priority>_<task-name>_<HUID>
+<Priority> <task-name> <HUID>
 
 # Priority
-<usize><usize>
+<usize>
 
-# HEAD.toml format
-title = String
-descriptions = String
-references = [Any]
+# HEAD.md format
+    # <task-name>
+        <descriptions>
+
+    # Status: <status>
+    # Ref
+
