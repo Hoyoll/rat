@@ -9,10 +9,7 @@
 user given folder name just below ./rat
 
 # Task-name
-<Priority> <task-name> <HUID>
-
-# Priority
-<usize>
+<task-name> <HUID>
 
 # HEAD.md format
     Author: <author>
