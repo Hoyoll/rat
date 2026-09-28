@@ -1,7 +1,12 @@
 # Dir structure
 ./rat
-    /<Task-name>
-        /HEAD.md
+    .LANE
+    /<Lane>
+        /<Task-name>
+            /HEAD.md
+
+# Lane
+user given folder name just below ./rat
 
 # Task-name
 <Priority> <task-name> <HUID>
@@ -10,9 +15,14 @@
 <usize>
 
 # HEAD.md format
+    Author: <author>
+    Date:   <date>
+
     # <task-name>
         <descriptions>
 
-    # Status: <status>
-    # Ref
+# author
+get the signature and username from git
 
+# date
+using the git diff format
