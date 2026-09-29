@@ -1,9 +1,15 @@
 # Dir structure
 ./rat
-    .LANE
-    /<Lane>
+    /task
         /<Task-name>
             /HEAD.md
+    /lane
+        /<Lane>
+            /<symlink-#Task-name>
+    /tag
+        /<Tag>
+            /<symlink-#Task-name>
+    CONFIG.toml
 
 # Lane
 user given folder name just below ./rat
