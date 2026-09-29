@@ -1,7 +1,5 @@
 use std::{
-    env,
-    fs::{self, DirEntry, create_dir_all, read_dir, remove_dir_all, rename},
-    path::{Path, PathBuf},
+    collections::{HashMap, HashSet}, env, ffi::OsString, fs::{self, DirEntry, create_dir_all, read_dir, remove_dir_all, rename, symlink_metadata}, path::{Path, PathBuf}
 };
 
 use chrono::Local;
@@ -15,6 +13,12 @@ mod dir {
     pub const LANE: &str = "lane";
     pub const TAG: &str = "tag";
     pub const TASK: &str = "task";
+}
+
+mod op {
+    pub const AND: &str = ":";
+    pub const OR: &str = "+";
+    pub const NOT: &str = "-";
 }
 
 mod command {
@@ -241,40 +245,112 @@ Date:     {date_format}
             return;
         }
         (Some(command::TAG), true) => {
-            let mut tags = Vec::new();
-            while let Some(arg) = args.next() {
-                match arg.as_str() {
-                    "+" => {
-                        break;
+            match args.next().as_deref() {
+                Some(command::ADD) => {
+                    let mut tags = Vec::new();
+                    while let Some(arg) = args.next() {
+                        match arg.as_str() {
+                            "+" => {
+                                break;
+                            }
+                            _ => {
+                                tags.push(arg);
+                            }
+                        }
                     }
-                    _ => {
-                        tags.push(arg);
+                    //println!("here?");
+                    let title = args.collect::<Vec<_>>().join(" ");
+                    let target_task = path.join(dir::TASK).join(&title);
+                    if !target_task.is_dir() {
+                        println!("Task `{title}` does not exist!");
+                        return;
+                    }
+                    for tag in &tags {
+                        let tag_dir = path.join(dir::TAG).join(&tag);
+                        if let Err(e) = create_dir_all(&tag_dir) {
+                            println!("Cannot create tag `{tag}`");
+                            println!("{}", e.to_string());
+                            continue;
+                        }
+                        //.join(&dir_name);
+                        let dest = PathBuf::from("..").join("..").join(dir::TASK).join(&title);
+                        if let Err(e) = Rat::symlink(&dest, tag_dir.join(&title)) {
+                            println!("File failed to create symlink for {:?}", &title);
+                            println!("{}", e.to_string());
+                            continue;
+                        }
+                    }
+                    println!("Tags {:?} registered for {title}", tags);
+                }
+                Some(command::LIST) => {
+                    let tag_dir = path.join(dir::TAG);
+                    match args.next().as_deref() {
+                        Some(op::OR) => {
+                            let tags = args.collect::<Vec<_>>();
+                            let mut collect = HashSet::new();
+                            //collect.intersection(other)
+                            for tag in &tags {
+                                let current_tag = tag_dir.join(tag);
+                                let dir = read_dir(&current_tag).unwrap();
+                                for e in dir {
+                                    e.map(|entry| {
+                                        let p = entry.path();
+                                        if fs::metadata(&p).is_err() {
+                                            fs::remove_file(&p);
+                                            return;
+                                        }
+                                        collect.insert(entry.file_name());
+                                    });
+                                }
+                            }
+                            for task in collect {
+                                println!("{}", task.to_string_lossy());
+                            }
+                        }
+                        Some(op::AND) => {
+                            let tags = args.collect::<Vec<_>>();
+                            let mut collect = HashMap::<OsString, String>::new();
+                            
+                            for tag in &tags {
+                                let current_tag = tag_dir.join(tag);
+                                let dir = read_dir(&current_tag).unwrap();
+                                for e in dir {
+                                    e.map(|entry| {
+                                        let p = entry.path();
+                                        if fs::metadata(&p).is_err() {
+                                            fs::remove_file(&p);
+                                            return;
+                                        }
+                                        let name = entry.file_name();
+                                        if let Some(t) = collect.get_mut(&name) {
+                                            t.push_str(tag);
+                                        } else {
+                                            collect.insert(name, tag.into());
+                                        }
+                                        //collect.insert(entry, v)
+                                        //collect.insert(entry.file_name());
+                                    });
+                                }
+                            }
+                            let col = tags.join("");
+                            
+                            for (name, str) in collect {
+                                if str.as_str() == col.as_str() {
+                                    println!("{}", name.to_string_lossy())
+                                }
+                            }
+                        }// for exclusive
+                        Some(op::NOT) => {
+                            unimplemented!("NOT is NOT implemented yet!")
+                        }// for object not having those tags
+                        Some(misc) => {}
+                        None => {}
                     }
                 }
-            }
-            //println!("here?");
-            let title = args.collect::<Vec<_>>().join(" ");
-            let target_task = path.join(dir::TASK).join(&title);
-            if !target_task.is_dir() {
-                println!("Task `{title}` does not exist!");
-                return;
-            }
-            for tag in &tags {
-                let tag_dir = path.join(dir::TAG).join(&tag);
-                if let Err(e) = create_dir_all(&tag_dir) {
-                    println!("Cannot create tag `{tag}`");
-                    println!("{}", e.to_string());
-                    continue;
-                }
-                //.join(&dir_name);
-                let dest = PathBuf::from("..").join("..").join(dir::TASK).join(&title);
-                if let Err(e) = Rat::symlink(&dest, tag_dir.join(&title)) {
-                    println!("File failed to create symlink for {:?}", &title);
-                    println!("{}", e.to_string());
-                    continue;
+                _ => {
+                    println!("Options: [{}, {}]", command::ADD, command::LIST)
                 }
             }
-            println!("Tags {:?} registered for {title}", tags);
             //let title =
         }
         (None, true) => {
@@ -285,8 +361,8 @@ Date:     {date_format}
         }
         _ => {
             println!("rat add <task-name> is how you use it")
-        
-        //    println!()
-        },
+
+            //    println!()
+        }
     }
 }
