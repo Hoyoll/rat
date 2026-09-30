@@ -32,6 +32,7 @@ mod command {
     pub const MOVE: &str = "mv";
     pub const TAG: &str = "tag";
     pub const PATH: &str = "path";
+    pub const HELP: &str = "help";
 }
 
 struct Rat;
@@ -196,31 +197,12 @@ fn main() {
         }
         (Some(command::ADD), true) => {
             let config = Rat::get_config(&path);
-            let user_child = std::process::Command::new("git")
-                .args(&["config", "user.name"])
-                .output();
-            let user_email = std::process::Command::new("git")
-                .args(&["config", "user.email"])
-                .output();
-            let author = match (user_child, user_email) {
-                (Err(_), Err(_)) => "null".into(),
-                (Ok(name), Ok(email)) => {
-                    let mut user_name = String::from_utf8_lossy(&name.stdout).trim().to_string();
-                    let email = String::from_utf8_lossy(&email.stdout).trim().to_string();
-                    //&format!("{user_name} {email}")
-                    user_name.push(' ');
-                    user_name.push_str(&email);
-                    //println!("{}", user_name);
-                    user_name
-                    //let w = c.wait_with_output().unwrap();
-                }
-                _ => "null".into(),
-            };
             let title = args.collect::<Vec<_>>().join(" ");
-            let now = Local::now();
-            let date_format = now.format("%a %b %d %H:%M:%S %Y %z").to_string();
             let dir_name = match config.collision_protection {
                 true => {
+                    let now = Local::now();
+                    //let date_format = now.format("%a %b %d %H:%M:%S %Y %z").to_string();
+
                     let huid = now.format("%Y-%m-%d_%H-%M-%S").to_string();
                     //let created = now.format("%a %b %e %H:%M:%S %Y %z").to_string();
                     format!("{} {}", title, huid)
@@ -239,17 +221,6 @@ fn main() {
             if let Err(e) = fs::create_dir_all(&target) {
                 println!("Dir failed to create {:?}", &dir_name);
                 println!("{}", e.to_string());
-            }
-            let format = format!(
-                r#"Author:   {author}
-Date:     {date_format}
-
-# {title}"#
-            );
-            let rat_file = target.join(RAT_HEAD);
-            if let Err(e) = fs::write(&rat_file, format) {
-                println!("File failed to create {:?}", rat_file);
-                println!("{}", e.to_string())
             }
             if let Err(e) = Rat::symlink(dest, target_lane) {
                 eprintln!("File failed to create symlink for {:?}", &dir_name);
@@ -375,6 +346,9 @@ Date:     {date_format}
                 }
             }
             //let title =
+        }
+        (Some(command::HELP), false | true) => {
+            println!("Basic usage: `rat`");
         }
         (None, true) => {
             println!("rat add <task-name> is how you use it")
