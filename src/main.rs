@@ -13,6 +13,7 @@ mod dir {
     pub const LANE: &str = "lane";
     pub const TAG: &str = "tag";
     pub const TASK: &str = "task";
+    pub const REMOVE: &str = "rm";
 }
 
 mod op {
@@ -30,6 +31,7 @@ mod command {
     pub const ADD: &str = "add";
     pub const MOVE: &str = "mv";
     pub const TAG: &str = "tag";
+    pub const PATH: &str = "path";
 }
 
 struct Rat;
@@ -74,6 +76,7 @@ fn main() {
             create_dir_all(path.join(dir::LANE));
             create_dir_all(path.join(dir::TAG));
             create_dir_all(path.join(dir::TASK));
+            create_dir_all(path.join(dir::REMOVE));
             fs::write(
                 path.join(RAT_CONFIG),
                 toml::to_string(&Config {
@@ -85,6 +88,13 @@ fn main() {
             create_dir_all(path.join(dir::LANE).join("open"));
             println!("Rat has been initiated");
         }
+        (Some(command::INIT), true) => {
+            create_dir_all(path.join(dir::LANE));
+            create_dir_all(path.join(dir::TAG));
+            create_dir_all(path.join(dir::TASK));
+            create_dir_all(path.join(dir::REMOVE));
+            println!("Rat has been (re)initiated");
+        }
         (Some(command::LSP), true) => {
             println!("Soon...")
         }
@@ -93,19 +103,8 @@ fn main() {
             let mut config = Rat::get_config(&path);
             match args.next().as_deref() {
                 None => {
-                    //let c_lane = fs::read_to_string(path.join(RAT_LANE)).unwrap();
                     println!("Current lane: {}", config.current_lane);
-                }
-                Some(command::LIST) => {
-                    let rd = read_dir(lane_dir).unwrap();
-                    for e in rd {
-                        e.map(|entry| {
-                            //if entry.metadata().unwrap().is_dir() {
-                            println!("{}", entry.file_name().to_string_lossy())
-                            //}
-                        });
-                    }
-                }
+                } 
                 Some(command::REMOVE) => match args.next().as_deref() {
                     Some(lane) => {
                         let target = lane_dir.join(lane);
@@ -118,19 +117,35 @@ fn main() {
                     None => {
                         println!("Try doing: rat lane {} <lane>", command::REMOVE);
                     }
-                },
+                }
+                Some(command::MOVE) => {
+                    if let Some(lane) = args.next() {
+                        config.current_lane = lane;
+                    } 
+                    fs::write(path.join(RAT_CONFIG), toml::to_string(&config).unwrap());
+                    println!("Current lane: {}", config.current_lane);
+                }
+                Some(command::LIST) => {
+                    let dir = read_dir(&lane_dir).unwrap();
+                    for e in dir {
+                        e.map(|entry| {
+                            println!("{}", entry.file_name().to_string_lossy())
+                        });
+                    }
+                }
                 Some(arg) => {
                     config.current_lane = arg.to_string();
-                    fs::write(path.join(RAT_CONFIG), toml::to_string(&config).unwrap());
+                    //fs::write(path.join(RAT_CONFIG), toml::to_string(&config).unwrap());
                     create_dir_all(lane_dir.join(&arg));
-                    println!("Current lane: {}", arg);
+                    println!("Created lane: {}", arg);
                 }
             }
         }
         (Some(command::REMOVE), true) => {
             let title = args.collect::<Vec<_>>().join(" ");
             let target = path.join(dir::TASK).join(&title);
-            if let Err(e) = remove_dir_all(&target) {
+            let dest = path.join(dir::REMOVE).join(&title);
+            if let Err(e) = rename(&target, &dest) {
                 println!("{}", e.to_string());
                 return;
             }
@@ -195,7 +210,7 @@ fn main() {
                     //&format!("{user_name} {email}")
                     user_name.push(' ');
                     user_name.push_str(&email);
-                    println!("{}", user_name);
+                    //println!("{}", user_name);
                     user_name
                     //let w = c.wait_with_output().unwrap();
                 }
@@ -237,12 +252,21 @@ Date:     {date_format}
                 println!("{}", e.to_string())
             }
             if let Err(e) = Rat::symlink(dest, target_lane) {
-                println!("File failed to create symlink for {:?}", &dir_name);
-                println!("{}", e.to_string());
+                eprintln!("File failed to create symlink for {:?}", &dir_name);
+                eprintln!("{}", e.to_string());
                 return;
             }
             println!("New rat food at {}", dir_name);
             return;
+        }
+        (Some(command::PATH), true) => {
+            let mut task_path = path.join(dir::TASK);
+            let title = args.collect::<Vec<_>>().join(" ");
+            task_path = task_path.join(&title);
+            if !task_path.is_dir() {
+                return eprintln!("Task `{title}` does not exist!")
+            }
+            println!("{}", task_path.to_string_lossy())
         }
         (Some(command::TAG), true) => {
             match args.next().as_deref() {
@@ -262,7 +286,7 @@ Date:     {date_format}
                     let title = args.collect::<Vec<_>>().join(" ");
                     let target_task = path.join(dir::TASK).join(&title);
                     if !target_task.is_dir() {
-                        println!("Task `{title}` does not exist!");
+                        eprintln!("Task `{title}` does not exist!");
                         return;
                     }
                     for tag in &tags {
@@ -343,8 +367,7 @@ Date:     {date_format}
                         Some(op::NOT) => {
                             unimplemented!("NOT is NOT implemented yet!")
                         }// for object not having those tags
-                        Some(misc) => {}
-                        None => {}
+                        _ => eprintln!("Invalid operation! we only support {} and {}", op::AND, op::OR) 
                     }
                 }
                 _ => {
