@@ -20,16 +20,9 @@ mod dir {
     pub const REMOVE: &str = "rm";
 }
 
-mod op {
-    pub const AND: &str = "AND";
-    pub const OR: &str = "OR";
-    pub const NOT: &str = "NOT";
-}
-
 mod command {
     pub const INIT: &str = "init";
     pub const LIST: &str = "ls";
-    pub const LSP: &str = "lsp";
     pub const REMOVE: &str = "rm";
     pub const ADD: &str = "add";
     pub const TAG: &str = "tag";
@@ -98,9 +91,6 @@ fn main() {
             create_dir_all(path.join(dir::REMOVE));
             println!("Rat has been (re)initiated");
         }
-        (Some(command::LSP), true) => {
-            println!("Soon...")
-        } 
         (Some(command::REMOVE), true) => {
             let title = args.collect::<Vec<_>>().join(" ");
             let target = path.join(dir::TASK).join(&title);
@@ -121,7 +111,7 @@ fn main() {
             }
         }
         (Some(command::ADD), true) => {
-            let config = Rat::get_config(&path); 
+            let config = Rat::get_config(&path);
             while let Some(title) = args.next() {
                 let dir_name = match config.collision_protection {
                     true => {
@@ -135,8 +125,8 @@ fn main() {
                 if let Err(e) = fs::create_dir_all(&target) {
                     println!("Dir failed to create {:?}", &dir_name);
                     println!("{}", e.to_string());
-                } 
-                println!("New rat food at {}", dir_name); 
+                }
+                println!("New rat food at {}", dir_name);
             }
         }
         (Some(command::PATH), true) => {
@@ -190,70 +180,50 @@ fn main() {
                 }
                 Some(command::LIST) => {
                     let tag_dir = path.join(dir::TAG);
-                    match args.next().as_deref() {
-                        Some(op::OR) => {
-                            let tags = args.collect::<Vec<_>>();
-                            let mut collect = HashSet::new();
-                            for tag in &tags {
-                                let current_tag = tag_dir.join(tag);
-                                let dir = read_dir(&current_tag).unwrap();
-                                for e in dir {
-                                    e.map(|entry| {
-                                        let p = entry.path();
-                                        if fs::metadata(&p).is_err() {
-                                            fs::remove_file(&p);
-                                            return;
-                                        }
-                                        collect.insert(entry.file_name());
-                                    });
-                                }
-                            }
-                            for task in collect {
-                                println!("{}", task.to_string_lossy());
-                            }
-                        }
-                        Some(op::AND) => {
-                            let tags = args.collect::<Vec<_>>();
-                            let mut collect = HashMap::<OsString, String>::new();
-
-                            for tag in &tags {
-                                let current_tag = tag_dir.join(tag);
-                                let dir = read_dir(&current_tag).unwrap();
-                                for e in dir {
-                                    e.map(|entry| {
-                                        let p = entry.path();
-                                        if fs::metadata(&p).is_err() {
-                                            fs::remove_file(&p);
-                                            return;
-                                        }
-                                        let name = entry.file_name();
-                                        if let Some(t) = collect.get_mut(&name) {
-                                            t.push_str(tag);
-                                        } else {
-                                            collect.insert(name, tag.into());
-                                        }
-                                        //collect.insert(entry, v)
-                                        //collect.insert(entry.file_name());
-                                    });
-                                }
-                            }
-                            let col = tags.join("");
-
-                            for (name, str) in collect {
-                                if str.as_str() == col.as_str() {
-                                    println!("{}", name.to_string_lossy())
-                                }
-                            }
-                        } // for exclusive
-                        Some(op::NOT) => {
-                            unimplemented!("NOT is NOT implemented yet!")
-                        } // for object not having those tags
-                        _ => eprintln!(
-                            "Invalid operation! we only support {} and {}",
-                            op::AND,
-                            op::OR
-                        ),
+                    let read = read_dir(&tag_dir).unwrap();
+                    for d in read {
+                        d.map(|dir| {
+                            println!("{}", dir.file_name().to_string_lossy());
+                        });
                     }
+                }
+                Some(one) => {
+                    let tag_dir = path.join(dir::TAG);
+                    let mut tags = args.collect::<Vec<_>>();
+                    tags.insert(0, one.to_string());
+                    let mut collect = HashMap::<OsString, String>::new(); 
+                    for tag in &tags {
+                        
+
+                        let current_tag = tag_dir.join(tag);
+                        read_dir(&current_tag).map(|dir| {
+                            for e in dir {
+                                e.map(|entry| {
+                                    let p = entry.path();
+                                    if fs::metadata(&p).is_err() {
+                                        fs::remove_file(&p);
+                                        return;
+                                    }
+                                    let name = entry.file_name();
+                                    if let Some(t) = collect.get_mut(&name) {
+                                        t.push_str(tag);
+                                    } else {
+                                        collect.insert(name, tag.into());
+                                    }
+                                    //collect.insert(entry, v)
+                                    //collect.insert(entry.file_name());
+                                });
+                            }
+                        });
+                    }
+                    let col = tags.join("");
+
+                    for (name, str) in collect {
+                        if str.as_str() == col.as_str() {
+                            println!("{}", name.to_string_lossy())
+                        }
+                    }
+                    //println!("Options: [{}, {}]", command::ADD, command::LIST)
                 }
                 _ => {
                     println!("Options: [{}, {}]", command::ADD, command::LIST)
@@ -267,10 +237,18 @@ fn main() {
         (Some("version"), false | true) => {
             println!("0.1")
         }
+        (Some(task_name), true) => {
+            let mut task_path = path.join(dir::TASK);
+            task_path = task_path.join(&task_name);
+            if !task_path.is_dir() {
+                return eprintln!("Task `{task_name}` does not exist!");
+            }
+            println!("{}", task_path.to_string_lossy())
+        }
         (None, true) => {
             println!("rat add <task-name> is how you use it")
         }
-        (_, false) => {
+        (None, false) => {
             println!("Not suitable directory for rat, try running `rat init`")
         }
         _ => {
