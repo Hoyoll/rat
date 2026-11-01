@@ -25,6 +25,7 @@ mod command {
     pub const LIST: &str = "ls";
     pub const REMOVE: &str = "rm";
     pub const ADD: &str = "add";
+    pub const EAT: &str = "eat";
     pub const TAG: &str = "tag";
     pub const PATH: &str = "path";
     pub const HELP: &str = "help";
@@ -125,6 +126,19 @@ fn main() {
                 if let Err(e) = fs::create_dir_all(&target) {
                     println!("Dir failed to create {:?}", &dir_name);
                     println!("{}", e.to_string());
+                    continue;
+                }
+                println!("New rat food at {}", dir_name);
+            }
+        }
+        (Some(command::EAT), true) => {
+            while let Some(dir_name) = args.next() {
+                let destination = path.join(dir::TASK).join(&dir_name);
+                let source = &dir_name;
+                if let Err(e) = fs::rename(source, destination) { 
+                    println!("Failed to move dir: {:?}", &dir_name);
+                    println!("{}", e.to_string());
+                    continue;
                 }
                 println!("New rat food at {}", dir_name);
             }
